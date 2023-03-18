@@ -56,9 +56,16 @@ import tensorflow as tf
 # MAIN
 
 def main():
-    # LOAD JSON 
+    # LOAD DATA
+    
     with open("Presets.json", "r") as file:
         Presets = json.load(file)
+        
+    with open("osc_param_indices.json", "r") as file:
+        osc_param_indices = json.load(file)
+        
+    with open("osc_param_min_max.json", "r") as file:
+        osc_param_min_max = json.load(file)
     
     # # # GET DATA
     
@@ -101,6 +108,9 @@ def main():
     # get value_sets
     value_sets = [x[1:] for x in dataset]
     
+    # export value_sets for testing
+    with open("value_sets.json", "w") as output:
+        json.dump(value_sets, output)
     
     # GET INFO FOR PREDICTIONS
     
@@ -142,7 +152,7 @@ def main():
       
         
     # # NORMALIZE VALUE SETS 
-    val_sets_norm = normalize_dataset(value_sets, min_vals, max_vals)
+    val_sets_norm = normalize_dataset(value_sets, min_vals, max_vals, new_param_labels, osc_param_indices, osc_param_min_max, osc_param_value_types, preset_ids, Presets)
     
     # REPLACING None VALUES AND ADDING MASK --> 2D DATA STRUCTURE  
     val_sets_2D = add_masks2dataset(val_sets_norm)
@@ -207,7 +217,7 @@ def get_dict_of_value_types(param_labels, Presets):
     return types
 
 def get_value_types_for_osc_params(new_param_labels, Presets):
-    #get value types for a_osc_param[j] depending on osc_type and store as dict['a_osc{i}_param{j}'] in dict[osc_type]
+    #get value types for a_osc_param[j] depending on osc_type and store in dict[f'osc{i}'][f'{osc_type}'][f'a_osc{i}_param{j}']
     #create dict to store all dicts for osc_type in
     types_by_osc_type = {}
     for i in range (1,4):
@@ -235,7 +245,7 @@ def get_value_types_for_osc_params(new_param_labels, Presets):
                     types_by_osc_type[f'osc{i}'][osc_type] = {}
                 
                 # iterate over oscillator parameters j: a_osc{i}_param{j}      
-                for j in range (1,7):
+                for j in range(7):
                     
                     # get param_label for oscillator param[j]
                     param_label = f'a_osc{i}_param{j}'
@@ -245,7 +255,6 @@ def get_value_types_for_osc_params(new_param_labels, Presets):
                     
                         # get param in preset
                         param = preset['param_set'][param_label]
-                        
                         
                         # check if param_label already exists in dict for osc[i]_type
                         if param_label in types_by_osc_type[f'osc{i}'][osc_type]:
@@ -266,7 +275,7 @@ def get_value_types_for_osc_params(new_param_labels, Presets):
 
     # manually set values for osc_type = 1
     for i in range(1,4):
-        types_by_osc_type[f'osc{i}'][1] = {f'a_osc{i}_param1': 2, f'a_osc{i}_param2': 0, f'a_osc{i}_param3': 2, f'a_osc{i}_param4': 0, f'a_osc{i}_param5': 2, f'a_osc{i}_param6': 0}
+        types_by_osc_type[f'osc{i}']['1'] = {f'a_osc{i}_param1': 2, f'a_osc{i}_param2': 0, f'a_osc{i}_param3': 2, f'a_osc{i}_param4': 0, f'a_osc{i}_param5': 2, f'a_osc{i}_param6': 0}
     
     return types_by_osc_type
 
@@ -288,26 +297,63 @@ def get_min_max_values(value_sets):
 
     return min_vals, max_vals
 
-def normalize_dataset(value_sets, min_vals, max_vals):
+def normalize_dataset(value_sets, min_vals, max_vals, new_param_labels, osc_param_indices, osc_param_min_max, osc_param_value_types, preset_ids, Presets):
     val_sets_norm = []
-    for value_set in value_sets:
+    
+    # iterate over value_sets and get preset_id
+    for index, value_set in enumerate(value_sets):
+        
         val_set_norm = []
+        preset_id = preset_ids[index]
+        
+        # iterate over values
         for i, value in enumerate(value_set):
+            
             if value == None:
                 val_norm = None
-            else:
-                if min_vals[i] == max_vals[i]:
-                    if value < 0:
-                        val_norm = 0
-                    elif value > 1:
-                        val_norm = 1
+            
+            # get param_label
+            param_label = new_param_labels[i]
+                
+            # check if param is osc{i}_param
+            for i in range (1,4):
+                if param_label in osc_param_value_types[f'osc{i}']['1']:
+                    #print(param_label)
+                    
+                    if f'a_osc{i}_type' not in Presets[preset_id]['param_set']:
+                        osc_type = 0
+                        #print(f'preset_id: {preset_id}')
                     else:
-                        val_norm = value
+                        # get osc_type:
+                        osc_type = Presets[preset_id]['param_set'][f'a_osc{i}_type']['value']
+                        # round to int
+                        osc_type = round(osc_type)
+                    
+                    # get min_val
+                    min_val = osc_param_min_max[f'osc{i}'][f'{osc_type}'][param_label]['min']
+                    #print(min_val)
+                    
+                    # get max_val
+                    max_val = osc_param_min_max[f'osc{i}'][f'{osc_type}'][param_label]['max']
+                    #print(max_val)
+
+            else:
+                min_val = min_vals[i]
+                max_val = max_vals[i]
+                
+            if min_val == max_val:
+                if value < 0:
+                    val_norm = 0
+                elif value > 1:
+                    val_norm = 1
                 else:
-                    val_norm = (value - min_vals[i]) / (max_vals[i] - min_vals[i])
+                    val_norm = value
+            else:
+                val_norm = (value - min_vals[i]) / (max_vals[i] - min_vals[i])
             if not val_norm == None:
                 val_norm = float(val_norm)
             val_set_norm.append(val_norm)
+        #print(val_set_norm)
         val_sets_norm.append(val_set_norm)
     return val_sets_norm
 

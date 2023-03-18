@@ -15,17 +15,20 @@ with open("new_param_labels.json", "r") as file:
 
 
 # get all a_osc{i}_type and a_osc{i}_param{j} param_labels
-osc_param_labels = {}
+osc_param_labels = set()
 for i in range(15):
         if f'a_osc{i}_type' in new_param_labels:
             print( f'a_osc{i}_type')
         for j in range(15):
             if f'a_osc{i}_param{j}' in new_param_labels:
                 print( f'a_osc{i}_param{j}')
-                osc_param_labels[f'osc_{i}'] = (f'a_osc{i}_param{j}')
+                osc_param_labels.add(f'a_osc{i}_param{j}')
                 
 with open("osc_param_labels.json", "w") as output:
-    json.dump(osc_param_labels, output)                
+    json.dump(list(osc_param_labels), output)  
+
+print(osc_param_labels)
+              
                 
 
 # osc_type_1_count = 0
@@ -65,7 +68,8 @@ def get_value_types_for_osc_params(new_param_labels, Presets):
                 osc_type = int(preset['param_set'][f'a_osc{i}_type']['value'])
                 # #print(osc_type)
                 # if osc_type == 1:
-                
+                if osc_type == 0:
+                    print('osc_type == 0')
                 # check if osc_type exists in types_by_osc_type
                 if osc_type not in types_by_osc_type[f'osc{i}']:
                     
@@ -73,7 +77,7 @@ def get_value_types_for_osc_params(new_param_labels, Presets):
                     types_by_osc_type[f'osc{i}'][osc_type] = {}
                 
                 # iterate over oscillator parameters j: a_osc{i}_param{j}      
-                for j in range (1,7):
+                for j in range (8):
                     
                     # get param_label for oscillator param[j]
                     param_label = f'a_osc{i}_param{j}'
@@ -101,10 +105,7 @@ def get_value_types_for_osc_params(new_param_labels, Presets):
                         # print(param)
                         # print(types_by_osc_type)
                         changing_types.add(f'osc{i}, osc_type: {osc_type}, {param_label}')
-    #print(changing_types)
-    
-    #print(types_by_osc_type)
-    
+
     # manually set values for osc_type = 1
     # param_4 sehr oft = 2, warum???
     for i in range(1,4):

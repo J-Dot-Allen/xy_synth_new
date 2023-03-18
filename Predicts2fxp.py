@@ -72,12 +72,17 @@ with open("min_max_dict.json", "r") as file:
 with open("osc_param_value_types.json","r") as file:
     osc_param_value_types = json.load(file)
     # osc_param_value_types[f'osc{i}'][osc_type][param_label] -> param['value_type']
+   
+with open("osc_param_min_max.json","r") as file:
+    osc_param_min_max = json.load(file)
     
+with open("osc_param_labels.json", "r") as file:
+    osc_param_labels = json.load(file)
 
 # CONFIG
 
 # set threshold for regarding parameter as existent
-threshold = 0.4
+threshold = 0.2
 
 # MAIN
 
@@ -88,8 +93,12 @@ def main():
     # get value_type
     # reverse normalization
 
-    pred_param_sets = get_pred_param_sets(Predicts, new_param_labels, threshold, value_types, min_max_dict, osc_param_value_types)
-    
+    pred_param_sets = get_pred_param_sets(Predicts, new_param_labels, threshold, value_types, min_max_dict, osc_param_value_types, osc_param_min_max)
+    #print(len(pred_param_sets))
+        
+    # normalize predicted param_sets
+    pred_param_sets = rev_normalize(pred_param_sets, min_max_dict, osc_param_min_max, osc_param_labels)
+    #print(len(pred_param_sets))
     
     # ONLY FOR COMPARISON:
     # order every pred_param_set like in orig_preset and add missing params and get rid of incorrect predicted params
@@ -197,24 +206,25 @@ Preset = namedtuple('Preset', PRESET_BASE_FIELDS + ('params',))
 
 # FUNCTIONS
 
-def get_pred_param_sets(Predicts, new_param_labels, threshold, value_types, min_max_dict, osc_param_value_types):
+def get_pred_param_sets(Predicts, new_param_labels, threshold, value_types, min_max_dict, osc_param_value_types, osc_param_min_max):
     predict_param_sets = {}
     for predict in Predicts:
         preset_id = predict['preset_id']
         predict_param_set = {}
         # iterate over predicted param_set
         for i, predict_param in enumerate(predict['value_set']):
-            
+            print(f'length predict value set {len(predict["value_set"])}')
             # get label and value-/on_off-prediction
             param_label = new_param_labels[i]
             value_predict = predict_param[0]
             on_off_predict = predict_param[1]
-        
-                    
+            print(on_off_predict)
+                         
             # check if param is on or off
             if on_off_predict > threshold:
                 # reverse normalization
-                value = rev_normalize(value_predict, param_label, min_max_dict)
+                #value = rev_normalize(value_predict, param_label, min_max_dict, osc_param_min_max, predict['value_set'])
+                value = value_predict
                 # get value type
                 value_type = value_types[param_label]
       
@@ -222,62 +232,206 @@ def get_pred_param_sets(Predicts, new_param_labels, threshold, value_types, min_
                                 "value_type": value_type, 
                                 "value": value}
                 predict_param_set[param_label] = param_predict
+                print('ok')
+                print(f'length')
+        predict_param_sets[preset_id] = predict_param_set
+        
+    return predict_param_sets               
+           
                 
+        # # replace value_types of osc_params with value_types from osc_param_value_types 
+        # # and round to int if value_type is int    
+        # for param_label in predict_param_set:
+            
+        #     # check if value_type is osc{i}_param
+        #     for i in range (1,4):
+                
+        #         if param_label in osc_param_value_types[f'osc{i}']['1']:
+                    
+        #             # if f'a_osc{i}_type' does not exist set to 0
+        #             if f'a_osc{i}_type' not in predict_param_set:
+        #                 osc_type = 0
+        #             else:
+        #                 # get osc_type:
+        #                 osc_type = predict_param_set[f'a_osc{i}_type']['value']
+        #                 # round to int
+        #                 osc_type = round(osc_type)
+                    
+        #             # set min and max of osc_type
+        #             if osc_type < 0:
+        #                 osc_type = 0
+        #             elif osc_type > 11:
+        #                 osc_type = 11
+                    
+        #             # set value type for param_label
+        #             # osc_param_value_types[f'osc{i}'][osc_type][param_label]!= param['value_type']
+        #             predict_param_set[param_label]['value_type'] = osc_param_value_types[f'osc{i}'][f'{osc_type}']
+                    
+                    
+        # #             # # if value_type == 0 round value to int
+        # #             # if predict_param_set[param_label]['value_type'] == 0:
+                        
+        # #             #     # get value:
+        # #             #     value = predict_param_set[param_label]['value']
+        # #             #     # round value to int
+        # #             #     predict_param_set[param_label]['value'] = round(value)     
+                
+        # #         # if not osc_param --> round value to int if value_type == 0
+        #         else:
+        #             # get value type
+        #             value_type = predict_param_set[param_label]['value_type']
+                    
+        # #             # # if value type is int round to int
+        # #             # if value_type == 0:
+        # #             #     # get value
+        # #             #     value = predict_param_set[param_label]['value']
+        # #             #     # round value to int
+        #             predict_param_set[param_label]['value'] = value
+        #             print('hello')
+                    
+    # predict_param_sets[preset_id] = predict_param_set
+    # return predict_param_sets
+
+# def rev_normalize(value_predict, param_label, min_max_dict, osc_param_min_max, predict_value_set):
+    
+#     # check if param is osc{i}_param
+#     for i in range (1,3):
+#         if param_label in osc_param_value_types[f'osc{i}']['1']:
+            
+#             # if osc_type not in preset set 0
+#             if f'a_osc{i}_type' not in predict_value_set:
+#                 osc_type_norm = 0
+#                 print(predict_value_set.keys())
+#             else:
+#                 # get osc_type:
+#                 osc_type = predict_value_set[f'a_osc{i}_type']['value']
+#                 # round to int
+#                 osc_type_norm = round(rev_normalize(osc_type, f'a_osc{i}_type', min_max_dict, predict_value_set, osc_param_min_max))
+            
+#             # get min_val
+#             min_val = osc_param_min_max[f'osc{i}'][f'{osc_type_norm}'][param_label]['min']
+#             #print(min_val)
+            
+#             # get max_val
+#             max_val = osc_param_min_max[f'osc{i}'][f'{osc_type_norm}'][param_label]['max']
+#             #print(max_val)
+#         else:
+#             min_val = min_max_dict[param_label][0]
+#             max_val = min_max_dict[param_label][1]
+#     if min_val == max_val:
+#         value = value_predict
+#     else:
+#         value = (value_predict * (max_val-min_val)) + min_val 
+#     return value
+
+def rev_normalize(pred_param_sets, min_max_dict, osc_param_min_max, osc_param_labels):
+    
+    normrev_param_sets = {}
+    
+    # iterate over pred_param_sets
+    for preset_id in pred_param_sets:
+        
+        pred_param_set = pred_param_sets[preset_id]
+        length = len(pred_param_set)
+        print(f'length pred param set: {length}')
+        # create new dict
+        normrev_param_set = {}
+        
+        # rev-normalize osc_types first
+        for i in range(1,4):
+            param_label = f'a_osc{i}_type'
+            
+            if param_label in pred_param_set:
+            
+                # get value_predict
+                param = pred_param_set[param_label]
+                value_predict = param['value']
+                
+                # get min max vals
+                min_val = min_max_dict[param_label][0]
+                max_val = min_max_dict[param_label][1]
+            
+                # rev-normalize
+                if min_val == max_val:
+                    value = value_predict
+                else:
+                    value = (value_predict * (max_val-min_val)) + min_val
+                    
+                param_predict = {"param_label": param['param_label'], 
+                                "value_type": param['value_type'], 
+                                "value": value}
+            
+                # write into dict    
+                normrev_param_set[param_label] = param_predict
+        
+        # iterate over pred_param-set
+        for param_label in pred_param_set:
+        
+            # check if param is osc{i}_param 
+            if param_label in osc_param_labels:
+                for i in range (1,4):
+                    if param_label.startswith(f'a_osc{i}'):
+                        # check if osc_type is in pred_param_set
+                        if f'a_osc{i}_type' not in pred_param_set:
+                            osc_type = 0
+                            #print(f'a_osc{i}_type not existing?')
+                        else:
+                            # get osc_type:
+                            osc_type = pred_param_set[f'a_osc{i}_type']['value']
+                            # round to int
+                            osc_type = round(osc_type)
+                            
+                        # get min_val
+                        min_val = osc_param_min_max[f'osc{i}'][f'{osc_type}'][param_label]['min']
+                                              
+                        # get max_val
+                        max_val = osc_param_min_max[f'osc{i}'][f'{osc_type}'][param_label]['max']
+                        #print(max_val)
+            else:
+                # get min max vals
+                min_val = min_max_dict[param_label][0]
+                max_val = min_max_dict[param_label][1]
+            
+            # osc_value_type ausschließen
+            ###########
+            
+            # get value_predict
+            param = pred_param_set[param_label]
+            value_predict = param['value']
+                
+            # rev-normalize
+            if min_val == max_val:
+                value = value_predict
+            else:
+                value = (value_predict * (max_val-min_val)) + min_val
+                
+            param_predict = {"param_label": param['param_label'], 
+                            "value_type": param['value_type'], 
+                            "value": value}
+            
+            # write into dict    
+            normrev_param_set[param_label] = param_predict
+            
+            print(len(normrev_param_set))
+        
+        # ROUND
+        
         # replace value_types of osc_params with value_types from osc_param_value_types 
         # and round to int if value_type is int    
-        for param_label in predict_param_set:
+        for param_label in normrev_param_set:
             
-            # check if value_type is osc{i}_param
-            for i in range (1,3):
-                if param_label in osc_param_value_types[f'osc{i}']['1']:
-                    
-                    # get osc_type:
-                    osc_type = predict_param_set[f'a_osc{i}_type']['value']
-                    # round to int
-                    osc_type = round(osc_type)
-                    
-                    # set min and max of osc_type
-                    if osc_type < 1:
-                        osc_type = 1
-                    elif osc_type > 11:
-                        osc_type = 11
-                    
-                    # set value type for param_label
-                    # osc_param_value_types[f'osc{i}'][osc_type][param_label]!= param['value_type']
-                    predict_param_set[param_label]['value_type'] = osc_param_value_types[f'osc{i}'][f'{osc_type}']
-                    
-                    
-                    # if value_type == 0 round value to int
-                    if predict_param_set[param_label]['value_type'] == 0:
-                        
-                        # get value:
-                        value = predict_param_set[param_label]['value']
-                        # round value to int
-                        predict_param_set[param_label]['value'] = round(value)     
-                
-                # if not osc_param --> round value to int if value_type == 0
-                else:
-                    # get value type
-                    value_type = predict_param_set[param_label]['value_type']
-                    
-                    # if value type is int round to int
-                    if value_type == 0:
-                        # get value
-                        value = predict_param_set[param_label]['value']
-                        # round value to int
-                        predict_param_set[param_label]['value'] = round(value)
-                    
-        predict_param_sets[preset_id] = predict_param_set
-    return predict_param_sets
-
-def rev_normalize(value_predict, param_label, min_max_dict):
-    min_val = min_max_dict[param_label][0]
-    max_val = min_max_dict[param_label][1]
-    if min_val == max_val:
-        value = value_predict
-    else:
-        value = (value_predict * (max_val-min_val)) + min_val 
-    return value
+            #if value_type == 0 round value to int
+            if normrev_param_set[param_label]['value_type'] == 0:
+                # get value:
+                value = normrev_param_set[param_label]['value']
+                # round value to int
+                normrev_param_set[param_label]['value'] = round(value) 
+        
+        # add to dict    
+        normrev_param_sets[preset_id] = normrev_param_set
+        
+    return normrev_param_sets
+    
 
 def get_pred_Presets(pred_param_sets, Presets, threshold):
     predict_Presets = []
